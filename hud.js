@@ -7,6 +7,7 @@ class Game {
 		this.players = [];
 		for (var i = 0; i < 9; i++) {
 			this.players.push(new Player(doc, i));
+			this.players[i].initialize();
 			let btnCallback = this.onBtnMove.bind(this);
 			let obs = new MutationObserver(btnCallback).observe(this.players[i].deal, {attributes: true, attributeFilter: ['style'], attributeOldValue: true});
 			if (this.players[i].isButton()) {
@@ -16,14 +17,22 @@ class Game {
 	}
 
 	onBtnMove(mlist, obs) {
-		console.log(mlist[0].oldValue.split(';')[0]);
-		console.log(mlist[0].target.style.visibility);
-		if (this.players[this.btn].isButton()) {
-			this.btn = this.btn+1;
-			if (this.btn >= this.max) {
-				this.btn = 0;
+		let state1 = mlist[0].oldValue.split(';')[0].split(' ')[1];
+		let state2 = mlist[0].target.style.visibility;
+		if (state1 === 'hidden' && state2 === 'visible') {
+			let btnLegal = false;
+			while (!btnLegal) {
+				this.btn += 1;
+				if (this.btn >= this.max) {
+					this.btn = 0;
+				}
+				if (this.players[this.btn].initalized) {
+					btnLegal = true;
+				}
 			}
-			console.log(this.btn);
+			console.log(`Button moved to player ${this.btn}`);
+		}
+		if (this.players[this.btn].isButton()) {
 		}
 	}
 }
