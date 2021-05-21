@@ -2,7 +2,7 @@ class Game {
 	constructor(doc) {
 		this.doc = doc;
 		this.max = 6;
-		this.tocall = 0;
+		this.toCall = 0;
 		this.blindCounter = 0;
 
 		this.community = this.doc.querySelector(".f34l2e8");
@@ -31,13 +31,12 @@ class Game {
 	}
 
 	getToCall() {
-		return this.tocall;
+		return this.toCall;
 	}
 
 	setToCall(amt) {
 		this.blindCounter += 1;
-		this.tocall = amt;
-		console.log(`Blind counter is ${this.blindCounter}`);
+		this.toCall = amt;
 		if (this.blindCounter > 2) {
 			return 1;
 		}
@@ -55,7 +54,7 @@ class Game {
 				for (var i = 0; i < this.max; i++) {
 					this.players[i].setStreet(0);
 				}
-				this.tocall = 0;
+				this.toCall = 0;
 				this.blindCounter = 0;
 			}
 		}
@@ -68,6 +67,7 @@ class Game {
 				this.players[i].setStreet(street);
 			}
 			console.log(`${this.streets[street]} dealt`);
+			this.toCall = 0;
 		}
 		return onStreet;
 	}
@@ -84,8 +84,6 @@ class Player {
 		this.nhands = 0;
 		this.nvpip = 0;
 		this.npfr = 0;
-
-		this.tocall = 0;
 
 		this.vpipTmp = 0;
 		this.pfrTmp = 0;
@@ -137,26 +135,31 @@ class Player {
 	}
 
 	onBetChange(mlist, obs) {
-		let newBet = Number(this.bet.innerHTML);
+		let newBet = Number(this.bet.innerHTML.replace(/\D/, '')); // Will remove currency sign from cash games
+		let toCall = this.getToCall();
 
 		if (this.street === 0) {
-			if (newBet > this.getToCall()) {
+			if (newBet > toCall) {
 				let betReturn = this.setToCall(newBet);
 				if (betReturn > 0) {
-					console.log(`Player ${this.seatID} has ${this.getToCall()} to call, raises to ${newBet}`);
+					console.log(`Player ${this.seatID} has ${toCall} to call, raises to ${newBet}`);
+					this.pfrTmp = 1;
+					this.vpipTmp = 1;
 				}
 				else {
 					console.log(`Player ${this.seatID} posts a blind`);
 				}
-				this.pfrTmp = betReturn;
 			}
-			else {
-				console.log(`Player ${this.seatID} calls the bet of ${this.getToCall()}`);
+			else if (newBet < toCall) {
+				console.log(`Player ${this.seatID} folds`);
 			}
-			this.vpipTmp = 1;
+			else { // Call
+				console.log(`Player ${this.seatID} calls the bet of ${toCall}`);
+				this.vpipTmp = 1;
+			}
 		}
 
-		this.initialBet = Number(this.bet.innerHTML);
+		this.initialBet = newBet;
 	}
 
 	getVPIP() {
