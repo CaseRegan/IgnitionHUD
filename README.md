@@ -5,11 +5,11 @@ Simple Chrome extension that records HUD stats while playing on Ignition Casino 
 Current features:
 - VPIP
 - PFR
+- 3bet
 - Hands played
 
 TODO list:
-- Other important stats (3bet, agg)
-- Investigating/fixing bugs (players leaving and joining can confuse the HUD)
+- Other important stats (cbet, agg)
 - Support for multitabling
 - Starting automatically when you start a game
 - Automatically detecting table size
