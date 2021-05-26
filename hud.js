@@ -82,7 +82,6 @@ class Player {
 		this.seatID = seatID;
 
 		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
-		this.hole = this.seat.querySelector(`[data-qa="holeCards"]`);
 
 		this.nhands = 0;
 		this.nvpip 	= 0;
@@ -105,9 +104,11 @@ class Player {
 			this.nhands = 0;
 			this.nvpip = 0;
 			this.npfr = 0;
+			this.n3bet = 0;
 		}
 		this.bet = this.seat.querySelector(Player.betDOMQS);
 		this.note = this.seat.querySelector(Player.noteDOMQS);
+		this.hole = this.seat.querySelector(`[data-qa="holeCards"]`);
 
 		if (this.bet && this.status === 0) {
 			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, {characterData: true, childList: true, attributes: true, subtree: true});
@@ -117,11 +118,18 @@ class Player {
 			else {
 				this.logMessage("is your seat");
 			}
+			if (this.hole) {
+				this.holeObs = new MutationObserver(this.onHoleChange.bind(this)).observe(this.hole, {attributes: true, attributeFilter: ['style'], attributeOldValue: true});
+			}
 			this.status = 1;
 		}
-		else {
+		else if (!this.bet && this.status === 1) {
 			this.logMessage("is no longer sitting here, deinitialized");
 			this.status = 0;
+			this.bet = null;
+			this.note = null;
+			this.betObs = null
+			this.holeObs = null;
 		}
 	}
 
@@ -133,13 +141,12 @@ class Player {
 		let amtCall = toCall - this.lastBet;
 
 		if (this.game.street === 0) {
-			if (newBet === 0) {
-				if (amtCall === 0) {
-					// Currently inaccurate
-					// this.logMessage("continues to next street");
+			if (newBet === 0 || amtBet < 0) {
+				if (this.lastBet >= toCall) {
+					this.logMessage("continues");
 				}
 				else {
-					// this.logMessage("folds");
+					this.logMessage("folds");
 				}
 			}
 			else if (amtBet > amtCall) { // Player raises
@@ -180,6 +187,16 @@ class Player {
 		this.lastBet = newBet;
 	}
 
+	onHoleChange(mlist, obs) {
+		let oldOpacity = Number(mlist[0].oldValue.split(';')[2].split(' ')[2]); // TODO finish
+		let newOpacity = Number(mlist[0].target.style.opacity);
+		//console.log(`${oldOpacity}, ${newOpacity}`)
+		if (oldOpacity === 1 && newOpacity === 0) {
+			// I have another way of determining folds right now but this works
+			// this.logMessage("folds");
+		}
+	}
+
 	onStreetChange(street) {
 		// Right now there's nothing to do here
 	}
@@ -204,12 +221,13 @@ class Player {
 		if (this.note) {
 			let vpip = 0;
 			let pfr = 0;
+			let bet3 = 0;
 			if (this.nhands > 0) {
 				vpip = Math.round(100*this.nvpip/this.nhands);
 				pfr = Math.round(100*this.npfr/this.nhands);
-				bet3 = Math.round(100*this.n3bet/this.nHands);
+				bet3 = Math.round(100*this.n3bet/this.nhands);
 			}
-			this.note.value = `VPIP: ${vpip}%\nPFR: ${pfr}%\n3bet: ${bet3}\nHands: ${this.nhands}`;
+			this.note.value = `VPIP: ${vpip}%\nPFR: ${pfr}%\n3bet: ${bet3}%\nHands: ${this.nhands}`;
 		}
 	}
 }
