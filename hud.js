@@ -234,4 +234,8 @@ class Player {
 
 console.log("Started HUD!");
 
-new Game(document.querySelectorAll('[title="Table slot"]')[1].contentWindow.document, 6);
+let frames = document.querySelectorAll('[title="Table slot"]');
+
+for (var i = 1; i < frames.length; i++) {
+	new Game(frames[i].contentWindow.document, 6);
+}

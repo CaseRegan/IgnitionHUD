@@ -9,13 +9,7 @@
 		"default_popup": "popup.html",
 		"default_title": "Make sure you're loaded into a game before clicking start"
 	},
-	/*"content_scripts": [
-		{
-			"matches": ["*://*.ignitioncasino.eu/*"],
-			"js": ["hud.js"]
-		}
-	],*/
 	"permissions": [
-		"tabs", "<all_urls>"
+		"https://*.ignitioncasino.eu/static/poker-game/*"
 	]
 }
