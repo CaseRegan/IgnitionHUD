@@ -16,7 +16,7 @@
 		{
 			"matches": ["*://*.ignitioncasino.eu/static/poker-game/*"],
 			"run_at": "document_idle",
-			"js": ["start.js"]
+			"js": ["hud.js"]
 		}
 	]
 }
