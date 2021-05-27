@@ -1,14 +1,13 @@
 {
 	"manifest_version": 2,
 	"version": "1.0",
-
 	"name": "Ignition HUD",
 	"description": "A simple HUD for the Ignition Casino in-browser client",
-	/*"browser_action": {
-		"default_icon": "logo_main.png",
-		"default_popup": "popup.html",
-		"default_title": "Make sure you're loaded into a game before clicking start"
-	},*/
+	"icons": {
+		"16": "resources/logo_16.png",
+		"48": "resources/logo_48.png",
+		"128": "resources/logo_128.png"
+	},
 	"permissions": [
 		"activeTab",
 		"*://*.ignitioncasino.eu/static/poker-game/*"
