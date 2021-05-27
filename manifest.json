@@ -4,12 +4,20 @@
 
 	"name": "Ignition HUD",
 	"description": "A simple HUD for the Ignition Casino in-browser client",
-	"browser_action": {
+	/*"browser_action": {
 		"default_icon": "logo_main.png",
 		"default_popup": "popup.html",
 		"default_title": "Make sure you're loaded into a game before clicking start"
-	},
+	},*/
 	"permissions": [
-		"https://*.ignitioncasino.eu/static/poker-game/*"
+		"activeTab",
+		"*://*.ignitioncasino.eu/static/poker-game/*"
+	],
+	"content_scripts": [
+		{
+			"matches": ["*://*.ignitioncasino.eu/static/poker-game/*"],
+			"run_at": "document_idle",
+			"js": ["start.js"]
+		}
 	]
 }
