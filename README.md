@@ -7,9 +7,10 @@ Current features:
 - PFR
 - 3bet
 - Hands played
+- Multitable support
+- Runs automatically in background (doesn't require user interaction to start)
 
 TODO list:
 - Other important stats (cbet, agg)
-- Support for multitabling
-- Starting automatically when you start a game
-- Automatically detecting table size
+- Automatically detecting table size (very easy I'm just lazy)
+- Bug fixes including: better method of detecting that you've loaded into a game (currently uses a timer that guesses at the load time, on a very slow computer/connection things may break), testing for joining/leaving many tables (the basic use cases work but I haven't tested all corner ones)
