@@ -233,18 +233,26 @@ class Player {
 }
 
 let frame = document.getElementsByClassName("f1djomsr")[0];
+let games = [null, null, null, null];
 
 new MutationObserver(onFrameChange).observe(frame, {childList: true});
 
 function onFrameChange(mlist, obs) {
 	for (var i = 0; i < mlist.length; i++) {
 		if (mlist[i].addedNodes.length) {
-			console.log("starting timeout to account for load time...");
 			let iframe = mlist[i].addedNodes[0].querySelector('[title="Table slot"]');
-			setTimeout(function() {
-				console.log("timeout done");
-				new Game(iframe.contentWindow.document, 6);
-			}, 10000);
+			if (iframe) {
+				console.log("starting timeout to account for load time...");
+				setTimeout(function() {
+					console.log("timeout done");
+					console.log("game started");
+					games[i] = new Game(iframe.contentWindow.document, 6);
+				}, 10000);
+			}
+			else {
+				console.log("game closed");
+				games[i] = null;
+			}
 		}
 	}
 }
