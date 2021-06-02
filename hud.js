@@ -3,10 +3,11 @@ class Game {
 
 	static streetNames = ['Hole cards', 'Flop', 'Turn', 'River'];
 
-	constructor(doc, max) {
-		this.verbose = false;//true;
+	constructor(doc, id, max) {
+		this.verbose = false;
 
 		this.doc = doc;
+		this.gameID = id;
 		this.max = max;
 	
 		this.logMessage(`Initializing ${this.max}max game`);
@@ -75,11 +76,24 @@ class Game {
 class Player {
 	static btnDOMQS = ".fm87pe9.Desktop";
 	static betDOMQS = ".f1p6pf8a.Desktop";
-	static noteDOMQS = 'textarea[placeholder="Add note"]';
+	//static noteDOMQS = 'textarea[placeholder="Add note"]';
 
 	constructor(game, seatID) {
 		this.game = game;
 		this.seatID = seatID;
+
+		this.display = this.game.doc.createElement('div');
+		this.display.innerHTML = "";
+		this.display.class = "hud-stats-display";
+		this.display.style.position = "absolute";
+		this.display.style.visibility = "hidden";
+		this.display.style.backgroundColor = "white";
+		this.display.style.border = "1px solid black";
+		this.display.style.zIndex = 10000;
+		let root = this.game.doc.getElementsByClassName("f1qy5s7k")[0];
+		root.appendChild(this.display);
+		this.displayPositions = [0, 0, 0, 0];
+		this.display.onmousedown = this.dragMouseDown.bind(this);
 
 		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
 
@@ -97,6 +111,34 @@ class Player {
 
 		this.btn = this.seat.querySelector(Player.btnDOMQS);
 	}
+
+	dragMouseDown(e) {
+		e = e || this.game.doc.defaultView.event;
+		e.preventDefault();
+
+		this.displayPositions[2] = e.clientX;
+		this.displayPositions[3] = e.clientY;
+		this.display.onmouseup = this.closeDragStats.bind(this);
+		this.display.onmousemove = this.statsDrag.bind(this);
+	}
+
+	statsDrag(e) {
+		e = e || this.game.doc.defaultView.event;
+		e.preventDefault();
+
+		this.displayPositions[0] = this.displayPositions[2] - e.clientX;
+		this.displayPositions[1] = this.displayPositions[3] - e.clientY;
+		this.displayPositions[2] = e.clientX;
+		this.displayPositions[3] = e.clientY;
+
+		this.display.style.top = (this.display.offsetTop-this.displayPositions[1]) + "px";
+		this.display.style.left = (this.display.offsetLeft-this.displayPositions[0]) + "px";
+	}
+
+	closeDragStats() {
+		this.display.onmouseup = null;
+		this.display.onmousemove = null;
+	}
  	
  	// Make this player as active as possible; ran every time the button moves
 	reinitialize() {
@@ -107,28 +149,33 @@ class Player {
 			this.n3bet = 0;
 		}
 		this.bet = this.seat.querySelector(Player.betDOMQS);
-		this.note = this.seat.querySelector(Player.noteDOMQS);
+		//this.note = this.seat.querySelector(Player.noteDOMQS);
 		this.hole = this.seat.querySelector(`[data-qa="holeCards"]`);
 
 		if (this.bet && this.status === 0) {
 			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, {characterData: true, childList: true, attributes: true, subtree: true});
-			if (this.note) { // Player is someone other than you
-				this.logMessage("has a player")
-			}
-			else {
-				this.logMessage("is your seat");
-			}
+			//if (this.note) { // Player is someone other than you
+			//	this.logMessage("has a player");
+			//}
+			//else {
+			//	this.logMessage("is your seat");
+			//}
 			if (this.hole) {
 				this.holeObs = new MutationObserver(this.onHoleChange.bind(this)).observe(this.hole, {attributes: true, attributeFilter: ['style'], attributeOldValue: true});
 			}
+			let seatRect = this.seat.getBoundingClientRect();
+			this.display.style.top = seatRect.bottom + "px";
+			this.display.style.left = seatRect.right + "px";
+			this.display.style.visibility = "visible";
 			this.status = 1;
 		}
 		else if (!this.bet && this.status === 1) {
 			this.logMessage("is no longer sitting here, deinitialized");
+			this.display.style.visibility = "hidden";
 			this.status = 0;
 			this.bet = null;
-			this.note = null;
-			this.betObs = null
+			//this.note = null;
+			this.betObs = null;
 			this.holeObs = null;
 		}
 	}
@@ -139,6 +186,8 @@ class Player {
 
 		let toCall = this.game.toCall;
 		let amtCall = toCall - this.lastBet;
+
+		// Bug: when the player is in the hand, stats get messed up
 
 		if (this.game.street === 0) {
 			if (newBet === 0 || amtBet < 0) {
@@ -165,7 +214,7 @@ class Player {
 					if (this.game.betCounter === 2) {
 						this.logMessage(`has ${amtCall} to call, raises first in to ${newBet}`);
 					}
-					else if (this.game.betCounter === 3) {
+					else if (this.game.betCounter >= 3) {
 						this.logMessage(`has ${amtCall} to call, 3bets to ${newBet}`);
 						this._3bet = 1;
 					}
@@ -190,7 +239,6 @@ class Player {
 	onHoleChange(mlist, obs) {
 		let oldOpacity = Number(mlist[0].oldValue.split(';')[2].split(' ')[2]); // TODO finish
 		let newOpacity = Number(mlist[0].target.style.opacity);
-		//console.log(`${oldOpacity}, ${newOpacity}`)
 		if (oldOpacity === 1 && newOpacity === 0) {
 			// I have another way of determining folds right now but this works
 			// this.logMessage("folds");
@@ -218,17 +266,19 @@ class Player {
 	}
 
 	updateDisplay() {
-		if (this.note) {
-			let vpip = 0;
-			let pfr = 0;
-			let bet3 = 0;
-			if (this.nhands > 0) {
-				vpip = Math.round(100*this.nvpip/this.nhands);
-				pfr = Math.round(100*this.npfr/this.nhands);
-				bet3 = Math.round(100*this.n3bet/this.nhands);
-			}
-			this.note.value = `VPIP: ${vpip}%\nPFR: ${pfr}%\n3bet: ${bet3}%\nHands: ${this.nhands}`;
+		let vpip = 0;
+		let pfr = 0;
+		let bet3 = 0;
+		if (this.nhands > 0) {
+			vpip = Math.round(100*this.nvpip/this.nhands);
+			pfr = Math.round(100*this.npfr/this.nhands);
+			bet3 = Math.round(100*this.n3bet/this.nhands);
 		}
+		let displayStr = `Stats for Player ${this.seatID}</br>VPIP: ${vpip}%</br>PFR: ${pfr}%</br>3bet: ${bet3}%</br>Hands: ${this.nhands}`;
+		//if (this.note) {
+		//	this.note.value = displayStr;
+		//}
+		this.display.innerHTML = displayStr;
 	}
 }
 
@@ -246,7 +296,7 @@ function onFrameChange(mlist, obs) {
 				setTimeout(function() {
 					console.log("timeout done");
 					console.log("game started");
-					games[i] = new Game(iframe.contentWindow.document, 6);
+					games[i] = new Game(iframe.contentWindow.document, i, 6);
 				}, 10000);
 			}
 			else {
