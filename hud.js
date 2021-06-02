@@ -15,7 +15,6 @@ class Game {
 
 		this.doc = doc;			// The client uses an iframe for each table you're at and this is a pointer to the corresponding html doc
 		this.root = this.doc.querySelector(Game.rootDOMQS);
-		this.zoom = Number(this.doc.querySelector(Game.zoomDOMQS).style.zoom);
 		this.gameID = id;		// Indicates if this game is table 1, 2, 3, or 4
 		this.max = max;			// The maximum number of seats at the game (ex: 6 for a 6max game)
 		
@@ -47,6 +46,10 @@ class Game {
 		if (this.verbose) {
 			console.log(message);
 		}
+	}
+
+	getZoom() {
+		return Number(this.doc.querySelector(Game.zoomDOMQS).style.zoom);
 	}
 
 	onNewGame() {
@@ -161,8 +164,10 @@ class Player {
 
 		if (this.displayChanged) {
 			let seatRect = this.seat.getBoundingClientRect();
-			this.display.style.top = seatRect.top + "px";
-			this.display.style.left = seatRect.left + "px";
+			let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
+			let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.getZoom()).toString() + "px";
+			this.display.style.top = verticalMiddle;
+			this.display.style.left = horizontalMiddle;
 			this.displayChanged = 0;
 		}
 	}
@@ -180,8 +185,8 @@ class Player {
 			
 			// Make stats display visible and position it
 			let seatRect = this.seat.getBoundingClientRect();
-			let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.zoom).toString() + "px";
-			let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.zoom).toString() + "px";
+			let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
+			let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.getZoom()).toString() + "px";
 			this.display.style.top = verticalMiddle;
 			this.display.style.left = horizontalMiddle;
 			this.display.style.visibility = "visible";
