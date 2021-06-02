@@ -1,25 +1,29 @@
 class Game {
 	static communityDOMQS = ".f34l2e8";
+	static rootDOMQS = ".f1qy5s7k";
 
 	static streetNames = ['Hole cards', 'Flop', 'Turn', 'River'];
 
 	constructor(doc, id, max) {
 		this.verbose = false;
-
-		this.doc = doc;
-		this.gameID = id;
-		this.max = max;
-	
 		this.logMessage(`Initializing ${this.max}max game`);
 
-		this.street = 0;
-		this.betCounter = 0;
+		if (!doc) {
+			return null;
+		}
+
+		this.doc = doc;			// The client uses an iframe for each table you're at and this is a pointer to the corresponding html doc
+		this.root = this.doc.querySelector(Game.rootDOMQS);
+		this.gameID = id;		// Indicates if this game is table 1, 2, 3, or 4
+		this.max = max;			// The maximum number of seats at the game (ex: 6 for a 6max game)
+		
+		this.street = 0;		// Indicates what street the game is currently playing (preflop, flop, turn, or river)
+		this.betCounter = 0;	// Indicates the number of raises on the current street
 
 		this.community = this.doc.querySelector(Game.communityDOMQS);
-		this.flop = this.community.children[0]; // DOM element of first card of flop
-		this.turn = this.community.children[3]; // DOM element of turn card
-		this.river = this.community.children[4]; // DOM element of river card
-
+		this.flop = this.community.children[0]; 	// DOM element of first card of flop
+		this.turn = this.community.children[3]; 	// DOM element of turn card
+		this.river = this.community.children[4]; 	// DOM element of river card
 		new MutationObserver(this.makeStreetCallback(1).bind(this)).observe(this.flop, {attributes: true, childList: true, subtree: true});
 		new MutationObserver(this.makeStreetCallback(2).bind(this)).observe(this.turn, {attributes: true, childList: true, subtree: true});
 		new MutationObserver(this.makeStreetCallback(3).bind(this)).observe(this.river, {attributes: true, childList: true, subtree: true});
@@ -27,13 +31,25 @@ class Game {
 		this.players = [];
 		for (var i = 0; i < this.max; i++) {
 			this.players.push(new Player(this, i));
-			new MutationObserver(this.makeBTNCallback(i).bind(this)).observe(this.players[i].btn, {attributes: true, attributeFilter: ['style'], attributeOldValue: true});
+			let btnObsCallback = this.makeBTNCallback(i).bind(this);
+			let btnObsConfig = {
+				attributes: true,
+				attributeFilter: ['style'],
+				attributeOldValue: true
+			};
+			new MutationObserver(btnObsCallback).observe(this.players[i].btn, btnObsConfig);
 		}
 	}
 
 	logMessage(message) {
 		if (this.verbose) {
 			console.log(message);
+		}
+	}
+
+	onNewGame() {
+		for (var i = 0; i < this.max; i++) {
+			this.players[i].displayChanged = 1;
 		}
 	}
 
@@ -45,9 +61,7 @@ class Game {
 				this.logMessage(`Button moved to player ${seat}`);
 				this.street = 0;
 				for (var i = 0; i < this.max; i++) {
-					this.players[i].updateStats();
-					this.players[i].updateDisplay();
-					this.players[i].reinitialize();
+					this.players[i].onBTNMove();
 				}
 				this.street = 0;
 				this.toCall = 0;
@@ -59,9 +73,9 @@ class Game {
 
 	makeStreetCallback(street) {
 		function onStreet(mlist, obs) {
-			for (var i = 0; i < this.max; i++) {
-				this.players[i].onStreetChange(street);
-			}
+			//for (var i = 0; i < this.max; i++) {
+			//	this.players[i].onStreetChange(street);
+			//}
 			this.street = street;
 			this.toCall = 0;
 			this.betCounter = 0;
@@ -89,12 +103,12 @@ class Player {
 		this.display.style.border = "1px solid black";
 		this.display.style.zIndex = 10000;
 
-		let root = this.game.doc.getElementsByClassName("f1qy5s7k")[0];
-		root.appendChild(this.display);
+		this.game.root.appendChild(this.display);
 		this.displayPositions = [0, 0, 0, 0];
 		this.display.onmousedown = this.dragMouseDown.bind(this);
 
 		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
+		this.btn = this.seat.querySelector(Player.btnDOMQS);
 
 		this.nhands = 0;
 		this.nvpip 	= 0;
@@ -106,9 +120,8 @@ class Player {
 		this._3bet 	= 0;
 
 		this.lastBet = 0;
-		this.status = 0; // 0: uninitialized, 1: initialized
-
-		this.btn = this.seat.querySelector(Player.btnDOMQS);
+		this.status = 0;
+		this.displayChanged = 0;
 	}
 
 	dragMouseDown(e) {
@@ -139,40 +152,55 @@ class Player {
 		this.display.onmousemove = null;
 	}
  	
+	onBTNMove() {
+		this.updateStats();
+		this.updateDisplay();
+		this.reinitialize();
+
+		if (this.displayChanged) {
+			let seatRect = this.seat.getBoundingClientRect();
+			this.display.style.top = seatRect.top + "px";
+			this.display.style.left = seatRect.left + "px";
+			this.displayChanged = 0;
+		}
+	}
+
  	// Make this player as active as possible; ran every time the button moves
 	reinitialize() {
-		if (this.status === 0) { // Uninitialized
-			this.nhands = 0;
-			this.nvpip = 0;
-			this.npfr = 0;
-			this.n3bet = 0;
-		}
 		this.bet = this.seat.querySelector(Player.betDOMQS);
-		this.hole = this.seat.querySelector(`[data-qa="holeCards"]`);
+		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
 
-		if (this.bet && this.status === 0) {
-			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, {characterData: true, childList: true, attributes: true, subtree: true});
+		if (this.bet && this.status === 0) { // Active but uninitialized (player needs to be initialized)
 			this.logMessage("initialized");
-			if (this.hole) {
-				this.holeObs = new MutationObserver(this.onHoleChange.bind(this)).observe(this.hole, {attributes: true, attributeFilter: ['style'], attributeOldValue: true});
-			}
+			
+			// Create observer for bet DOM element
+			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, {characterData: true, childList: true, attributes: true, subtree: true});
+			
+			// Make stats display visible and position it
 			let seatRect = this.seat.getBoundingClientRect();
-			//this.display.style.top = seatRect.bottom + "px";
-			//this.display.style.left = seatRect.right + "px";
-			this.display.style.top = Math.floor(this.seatID/3)*this.display.offsetHeight + "px";
-			this.display.style.left = (this.seatID%3)*this.display.offsetWidth + "px";
+			let verticalMiddle = Math.round(seatRect.top+(seatRect.bottom-seatRect.top)/2).toString() + "px";
+			let horizontalMiddle = Math.round(seatRect.left+(seatRect.right-seatRect.left)/2).toString() + "px";
+			console.log(verticalMiddle);
+			console.log(horizontalMiddle);
+			this.display.style.top = verticalMiddle;
+			this.display.style.left = horizontalMiddle;
 			this.display.style.visibility = "visible";
+
 			this.status = 1;
 		}
-		else if (!this.bet && this.status === 1) {
-			this.logMessage("is no longer sitting here, deinitialized");
+		else if (!this.bet && this.status === 1) { // Inactive but initialized (player needs to be uninitialized)
+			this.logMessage("is no longer sitting here, uninitialized");
+
+			// Made stats display invisible
 			this.display.style.visibility = "hidden";
+
+			// Set status to uninitialized and make sure the player has no pointers to DOM objects
 			this.status = 0;
 			this.bet = null;
-			//this.note = null;
 			this.betObs = null;
-			this.holeObs = null;
 		}
+		// else: Active and initialized or inactive and uninitialzed (aka correct state)
+
 	}
 
 	onBetChange(mlist, obs) {
@@ -231,15 +259,6 @@ class Player {
 		this.lastBet = newBet;
 	}
 
-	onHoleChange(mlist, obs) {
-		let oldOpacity = Number(mlist[0].oldValue.split(';')[2].split(' ')[2]); // TODO finish
-		let newOpacity = Number(mlist[0].target.style.opacity);
-		if (oldOpacity === 1 && newOpacity === 0) {
-			// I have another way of determining folds right now but this works
-			// this.logMessage("folds");
-		}
-	}
-
 	onStreetChange(street) {
 		// Right now there's nothing to do here
 	}
@@ -254,10 +273,16 @@ class Player {
 			this.npfr += this._pfr;
 			this.n3bet += this._3bet;
 			this.nhands += 1;
-			this._vpip = 0;
-			this._pfr = 0;
-			this._3bet = 0;
 		}
+		else {
+			this.nvpip = 0;
+			this.npfr = 0;
+			this.n3bet = 0;
+			this.nhands = 0;
+		}
+		this._vpip = 0;
+		this._pfr = 0;
+		this._3bet = 0;
 	}
 
 	updateDisplay() {
@@ -270,9 +295,6 @@ class Player {
 			bet3 = Math.round(100*this.n3bet/this.nhands);
 		}
 		let displayStr = `Stats for Player ${this.seatID}</br>VPIP: ${vpip}%</br>PFR: ${pfr}%</br>3bet: ${bet3}%</br>Hands: ${this.nhands}`;
-		//if (this.note) {
-		//	this.note.value = displayStr;
-		//}
 		this.display.innerHTML = displayStr;
 	}
 }
@@ -285,13 +307,23 @@ new MutationObserver(onFrameChange).observe(frame, {childList: true});
 function onFrameChange(mlist, obs) {
 	for (var i = 0; i < mlist.length; i++) {
 		if (mlist[i].addedNodes.length) {
+			for (var j = 0 ; j < games.length; j++) {
+				if (games[j]) {
+					games[j].onNewGame();
+				}
+			}
+
+			let win = null;
 			let iframe = mlist[i].addedNodes[0].querySelector('[title="Table slot"]');
 			if (iframe) {
+				win = iframe.contentWindow;
+			}
+			if (win) {
 				console.log("starting timeout to account for load time...");
 				setTimeout(function() {
 					console.log("timeout done");
 					console.log("game started");
-					games[i] = new Game(iframe.contentWindow.document, i, 6);
+					games[i] = new Game(win.document, i, 6);
 				}, 10000);
 			}
 			else {
