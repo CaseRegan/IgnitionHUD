@@ -76,20 +76,19 @@ class Game {
 class Player {
 	static btnDOMQS = ".fm87pe9.Desktop";
 	static betDOMQS = ".f1p6pf8a.Desktop";
-	//static noteDOMQS = 'textarea[placeholder="Add note"]';
 
 	constructor(game, seatID) {
 		this.game = game;
 		this.seatID = seatID;
 
 		this.display = this.game.doc.createElement('div');
-		this.display.innerHTML = "";
 		this.display.class = "hud-stats-display";
 		this.display.style.position = "absolute";
 		this.display.style.visibility = "hidden";
 		this.display.style.backgroundColor = "white";
 		this.display.style.border = "1px solid black";
 		this.display.style.zIndex = 10000;
+
 		let root = this.game.doc.getElementsByClassName("f1qy5s7k")[0];
 		root.appendChild(this.display);
 		this.displayPositions = [0, 0, 0, 0];
@@ -149,23 +148,19 @@ class Player {
 			this.n3bet = 0;
 		}
 		this.bet = this.seat.querySelector(Player.betDOMQS);
-		//this.note = this.seat.querySelector(Player.noteDOMQS);
 		this.hole = this.seat.querySelector(`[data-qa="holeCards"]`);
 
 		if (this.bet && this.status === 0) {
 			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, {characterData: true, childList: true, attributes: true, subtree: true});
-			//if (this.note) { // Player is someone other than you
-			//	this.logMessage("has a player");
-			//}
-			//else {
-			//	this.logMessage("is your seat");
-			//}
+			this.logMessage("initialized");
 			if (this.hole) {
 				this.holeObs = new MutationObserver(this.onHoleChange.bind(this)).observe(this.hole, {attributes: true, attributeFilter: ['style'], attributeOldValue: true});
 			}
 			let seatRect = this.seat.getBoundingClientRect();
-			this.display.style.top = seatRect.bottom + "px";
-			this.display.style.left = seatRect.right + "px";
+			//this.display.style.top = seatRect.bottom + "px";
+			//this.display.style.left = seatRect.right + "px";
+			this.display.style.top = Math.floor(this.seatID/3)*this.display.offsetHeight + "px";
+			this.display.style.left = (this.seatID%3)*this.display.offsetWidth + "px";
 			this.display.style.visibility = "visible";
 			this.status = 1;
 		}

@@ -16,3 +16,4 @@ TODO list:
 - Automatically detecting table size (very easy I'm just lazy)
 - Bug fixes (there are bugs related to the stats so they may be slightly off -- I'm a busy guy but will get around to fixing these)
 - UI fixes/improvements (popups sometimes get lost offscreen when opening/closing tables and there is an issue with dragging them)
+- Errors when loading into a blank table (with no game). Unclear is these actually cause any problems though.
