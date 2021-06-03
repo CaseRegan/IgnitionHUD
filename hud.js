@@ -54,7 +54,7 @@ class Game {
 
 	onNewGame() {
 		for (var i = 0; i < this.max; i++) {
-			this.players[i].displayChanged = 1;
+			this.players[i].resetStatsPosition();
 		}
 	}
 
@@ -126,7 +126,6 @@ class Player {
 
 		this.lastBet = 0;
 		this.status = 0;
-		this.displayChanged = 0;
 	}
 
 	dragMouseDown(e) {
@@ -135,8 +134,8 @@ class Player {
 
 		this.displayPositions[2] = e.clientX;
 		this.displayPositions[3] = e.clientY;
-		this.display.onmouseup = this.closeDragStats.bind(this);
-		this.display.onmousemove = this.statsDrag.bind(this);
+		this.game.doc.onmouseup = this.closeDragStats.bind(this);
+		this.game.doc.onmousemove = this.statsDrag.bind(this);
 	}
 
 	statsDrag(e) {
@@ -153,23 +152,25 @@ class Player {
 	}
 
 	closeDragStats() {
-		this.display.onmouseup = null;
-		this.display.onmousemove = null;
+		this.game.doc.onmouseup = null;
+		this.game.doc.onmousemove = null;
+	}
+
+	resetStatsPosition() {
+		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
+		this.btn = this.seat.querySelector(Player.btnDOMQS);
+
+		let seatRect = this.seat.getBoundingClientRect();
+		let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
+		let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.getZoom()).toString() + "px";
+		this.display.style.top = verticalMiddle;
+		this.display.style.left = horizontalMiddle;
 	}
  	
 	onBTNMove() {
 		this.updateStats();
 		this.updateDisplay();
 		this.reinitialize();
-
-		if (this.displayChanged) {
-			let seatRect = this.seat.getBoundingClientRect();
-			let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
-			let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.getZoom()).toString() + "px";
-			this.display.style.top = verticalMiddle;
-			this.display.style.left = horizontalMiddle;
-			this.displayChanged = 0;
-		}
 	}
 
  	// Make this player as active as possible; ran every time the button moves
@@ -184,11 +185,7 @@ class Player {
 			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, {characterData: true, childList: true, attributes: true, subtree: true});
 			
 			// Make stats display visible and position it
-			let seatRect = this.seat.getBoundingClientRect();
-			let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
-			let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.getZoom()).toString() + "px";
-			this.display.style.top = verticalMiddle;
-			this.display.style.left = horizontalMiddle;
+			this.resetStatsPosition();
 			this.display.style.visibility = "visible";
 
 			this.status = 1;
@@ -309,15 +306,9 @@ let games = [null, null, null, null];
 
 new MutationObserver(onFrameChange).observe(frame, {childList: true});
 
-function onFrameChange(mlist, obs) {
+function onFrameChange(mlist, obs) {	
 	for (var i = 0; i < mlist.length; i++) {
 		if (mlist[i].addedNodes.length) {
-			for (var j = 0 ; j < games.length; j++) {
-				if (games[j]) {
-					games[j].onNewGame();
-				}
-			}
-
 			let win = null;
 			let iframe = mlist[i].addedNodes[0].querySelector('[title="Table slot"]');
 			if (iframe) {
@@ -334,6 +325,11 @@ function onFrameChange(mlist, obs) {
 			else {
 				console.log("game closed");
 				games[i] = null;
+			}
+			for (var j = 0; j < games.length; j++) {
+				if (games[j]) {
+					games[j].onNewGame();
+				}
 			}
 		}
 	}

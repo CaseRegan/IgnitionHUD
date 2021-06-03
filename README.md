@@ -2,9 +2,9 @@
 
 Simple Chrome extension that records HUD stats while playing on Ignition Casino in your browser. If you have the extension active, it will start automatically when you visit the poker section of IgnitionCasino.eu and display draggable stats popups as soon as a hand has been completed.
 
-![Screen shot](/screenshots/ss1.png?raw=true)
 ![Screen shot](/screenshots/ss2.png?raw=true)
-![Screen shot](/screenshots/ss3.png?raw=true)
+![Screen shot](/screenshots/ss4.png?raw=true)
+![Screen shot](/screenshots/ss5.png?raw=true)
 
 Current features:
 - A variety of useful stats (VPIP, PFR, 3bet, hands played)
