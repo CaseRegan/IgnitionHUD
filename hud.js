@@ -201,49 +201,48 @@ class Player {
     this.reinitialize();
   }
 
-    // Make this player as active as possible; ran every time the button moves
-reinitialize() {
-  this.bet = this.getBetDOM();
 
-  if (this.bet && this.status === 0) {
-    this.logMessage("initialized");
+  reinitialize() {
+    this.bet = this.getBetDOM();
 
-    this.hole = this.getHoleDOM();
-    let holeObsConfig = {
-      attributes: true,
-      attributeFilter: ['style'],
-      attributeOldValue: true
-    };
-    this.holeObs = new MutationObserver(this.onHoleChange.bind(this)).observe(this.hole, holeObsConfig);
+    if (this.bet && this.status === 0) {
+      this.logMessage("initialized");
 
-    let betObsConfig = {
-      characterData: true,
-      childList: true,
-      attributes: true,
-      subtree: true
-    };
-    this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, betObsConfig);
+      this.hole = this.getHoleDOM();
+      let holeObsConfig = {
+        attributes: true,
+        attributeFilter: ['style'],
+        attributeOldValue: true
+      };
+      this.holeObs = new MutationObserver(this.onHoleChange.bind(this)).observe(this.hole, holeObsConfig);
 
-    this.resetStatsPosition();
-    this.popup.style.visibility = "visible";
+      let betObsConfig = {
+        characterData: true,
+        childList: true,
+        attributes: true,
+        subtree: true
+      };
+      this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, betObsConfig);
 
-    this.status = 1;
-  } else if (!this.bet && this.status === 1) {
-    this.logMessage("is no longer sitting here, uninitialized");
+      this.resetStatsPosition();
+      this.popup.style.visibility = "visible";
 
-    // Made stats display invisible
-    this.popup.style.visibility = "hidden";
+      this.status = 1;
+    } else if (!this.bet && this.status === 1) {
+      this.logMessage("is no longer sitting here, uninitialized");
 
-    // Set status to uninitialized and make sure the player has no pointers to DOM objects
-    this.status = 0;
-    this.bet = null;
-    this.betObs = null;
-    this.holeObs = null;
+      // Made stats display invisible
+      this.popup.style.visibility = "hidden";
+
+      // Set status to uninitialized and make sure the player has no pointers to DOM objects
+      this.status = 0;
+      this.bet = null;
+      this.betObs = null;
+      this.holeObs = null;
+    }
   }
-    // else: Active and initialized or inactive and uninitialzed (aka correct state)
 
-}
-
+/** Processes events related to the bet in front of the player changing. */
 onBetChange(mlist, obs) {
   let newBet = Number(this.bet.innerHTML.replace(/\D/, '')).toFixed(2);
   let amtBet = (newBet - this.lastBet).toFixed(2);
@@ -252,31 +251,45 @@ onBetChange(mlist, obs) {
   let amtCall = toCall - this.lastBet;
 
   if (this.game.street === 0) {
+    /**
+     * Detects checks, zeroing out of bets when a 
+     * player continues to the next street, and folds. */
     if (newBet === 0 || amtBet < 0) {
       if (this.lastBet >= toCall) {
         this.logMessage("continues");
-      } else {
+      } 
+      else {
         this.logMessage("folds");
       }
-    } else if (amtBet > amtCall) { // Player raises
+    } 
+
+    /** Detects raises */
+    else if (amtBet > amtCall) {
+      /** 
+       * The bet counter is used to track how many raises 
+       * have occured. This lets us classify a raise as a 
+       * blind (0th or 1st), RFI, 3bet, 4bet, etc... */
+      /** TODO: bet detection system fails when a blind is 
+       * skipped (sometimes happens when people leave/join. */
       if (this.game.betCounter === 0) {
-          // Post small blind
           this.logMessage("posts small blind");
           this.game.betCounter += 1;
-      } else if (this.game.betCounter === 1) {
-        // Post big bliind
+      } 
+      else if (this.game.betCounter === 1) {
         this.logMessage("posts big blind");
         this.game.betCounter += 1;
-      } else {
-        // Raise first in
+      }
+      else {
         if (this.game.betCounter === 2) {
           this.logMessage(`has ${amtCall} to call, raises first in to ${newBet}`);
-        } else if (this.game.betCounter >= 3) {
-          // TODO: Fix and make this only capture 3bets, not 4bets+ as well
-          // There's an issue where if the player is involved in a 3bet hand it won't record correctly
+        } 
+        else if (this.game.betCounter === 3) {
+          /** TODO fix issues involving "your" seat being involved in 3bet
+           *  hands (need to identify the specifics of the issues first). */
           this.logMessage(`has ${amtCall} to call, 3bets to ${newBet}`);
           this._3bet = 1;
-        } else {
+        } 
+        else {
           this.logMessage(`has ${amtCall} to call, reraises to ${newBet}`);
         }
         this.game.betCounter += 1;
@@ -284,7 +297,10 @@ onBetChange(mlist, obs) {
         this._pfr = 1;
       }
       this.game.toCall = newBet;
-    } else {
+    }
+
+    /** Detects calls */
+    else {
       this.logMessage(`calls the bet of ${toCall}`);
       this._vpip = 1;
     }
@@ -293,6 +309,8 @@ onBetChange(mlist, obs) {
   this.lastBet = newBet;
 }
 
+  /** Processes events related to the hole cards changing 
+   * (most importantly, when the player is dealt in). */
   onHoleChange(mlist, obs) {
     let mlistSplit = mlist[0].oldValue.split(';');
     let state1 = mlistSplit[mlistSplit.length-2].split(' ');
@@ -310,6 +328,9 @@ onBetChange(mlist, obs) {
     this.game.logMessage(`Player ${this.seatID}: ${message}`);
   }
 
+  /** Updates the player's stats. Ran at the end of each hand 
+   * rather than during it, since some statistics depend on how 
+   * the rest of the hand goes */
   updateStats() {
     if (!this.dealtIn) {
       return;
@@ -333,6 +354,8 @@ onBetChange(mlist, obs) {
     this._3bet = 0;
   }
 
+  /** Updates the player's popup stats display to reflect the most 
+   * current statistics. */
   updateDisplay() {
     let winX = this.game.root.offsetWidth;
     let winY = this.game.root.offsetHeight;
