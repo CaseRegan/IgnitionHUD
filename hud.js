@@ -1,56 +1,42 @@
 class Game {
-	static communityDOMQS = ".f34l2e8";
-	static rootDOMQS = ".f1qy5s7k";
-	static zoomDOMQS = ".f1so0fyt";
-
-	static streetNames = ['Hole cards', 'Flop', 'Turn', 'River'];
-
-	constructor(doc, id, max) {
-		// The "verbose" flag determines if actions will be logged in the Chrome console
-		// If it is set to false, each call to "logMessage" will do nothing
+	constructor(doc, id) {
 		this.verbose = false;
 		this.logMessage(`Initializing ${this.max}max game`);
 
-		// TODO: better detection of if this game can be initialized or not
-		if (!doc) {
-			return null;
-		}
+		this.doc = doc;
+		this.gameID = id;
+		this.max = this.getMax();
+		this.street = 0;
+		this.toCall = 0;
+		this.betCounter = 0;
 
-		this.doc = doc;			// The client uses an iframe for each table you're at and this is a pointer to the corresponding html doc
-		this.gameID = id;		// Indicates if this game is table 1, 2, 3, or 4
-
-		this.max = this.doc.querySelector(Game.zoomDOMQS).childNodes.length-2;
-								// The maximum number of seats at the game (ex: 6 for a 6max game)
-		
-		this.street = 0;		// Indicates what street the game is currently playing (preflop, flop, turn, or river)
-		this.betCounter = 0;	// Indicates the number of raises on the current street
-
-		// Relate DOM elements to each group of community cards (flop, turn, and river)
-		this.community = this.doc.querySelector(Game.communityDOMQS);
+		this.root = this.getRootDOM();
+		this.community = this.getCommunityDOM();
 		this.flop = this.community.children[0];
 		this.turn = this.community.children[3];
 		this.river = this.community.children[4];
+		let comObsConfig = {
+			attributes: true,
+			childList: true,
+			subtree: true
+		};
+		new MutationObserver(this.makeStreetCallback(1).bind(this)).observe(
+			this.flop, comObsConfig);
+		new MutationObserver(this.makeStreetCallback(2).bind(this)).observe(
+			this.turn, comObsConfig);
+		new MutationObserver(this.makeStreetCallback(3).bind(this)).observe(
+			this.river, comObsConfig);
 
-		// Bind a custom callback function to changes in the DOM elements of each group of community cards
-		new MutationObserver(this.makeStreetCallback(1).bind(this)).observe(this.flop, {attributes: true, childList: true, subtree: true});
-		new MutationObserver(this.makeStreetCallback(2).bind(this)).observe(this.turn, {attributes: true, childList: true, subtree: true});
-		new MutationObserver(this.makeStreetCallback(3).bind(this)).observe(this.river, {attributes: true, childList: true, subtree: true});
-
- 		// This is the DOM element in which stats popups are placed
-		this.root = this.doc.querySelector(Game.rootDOMQS);
-
-		// Initialize list of players
 		this.players = [];
 		for (var i = 0; i < this.max; i++) {
 			this.players.push(new Player(this, i));
-			let btnObsCallback = this.makeBTNCallback(i).bind(this);
 			let btnObsConfig = {
 				attributes: true,
 				attributeFilter: ['style'],
 				attributeOldValue: true
 			};
-			// Observes button movement to detect when the next hand has started
-			new MutationObserver(btnObsCallback).observe(this.players[i].btn, btnObsConfig);
+			new MutationObserver(this.makeBTNCallback(i).bind(this)).observe(
+				this.players[i].btn, btnObsConfig);
 		}
 	}
 
@@ -60,21 +46,34 @@ class Game {
 		}
 	}
 
-	getZoom() {
-		return Number(this.doc.querySelector(Game.zoomDOMQS).style.zoom);
+	getMax() {
+		return this.doc.querySelector(".f1so0fyt").childNodes.length-2;
 	}
 
-	// Creates the custom callback function for each player to tell them that the button moved
+	getRootDOM() {
+		return this.doc.querySelector(".f1qy5s7k");
+	}
+
+	getCommunityDOM() {
+		return this.doc.querySelector(".f34l2e8");
+	}
+
+	getZoom() {
+		return Number(this.doc.querySelector(".f1so0fyt").style.zoom);
+	}
+
 	makeBTNCallback(seat) {
 		function onBTNMove(mlist, obs) {
 			let state1 = mlist[0].oldValue.split(';')[0].split(' ')[1];
 			let state2 = mlist[0].target.style.visibility;
+
 			if (state1 === 'hidden' && state2 === 'visible') {
 				this.logMessage(`Button moved to player ${seat}`);
-				this.street = 0;
+
 				for (var i = 0; i < this.max; i++) {
 					this.players[i].onBTNMove();
 				}
+
 				this.street = 0;
 				this.toCall = 0;
 				this.betCounter = 0;
@@ -84,15 +83,14 @@ class Game {
 	}
 
 	makeStreetCallback(street) {
+		const streetNames = ['Hole cards', 'Flop', 'Turn', 'River'];
+
 		function onStreet(mlist, obs) {
-			//for (var i = 0; i < this.max; i++) {
-			//	this.players[i].onStreetChange(street);
-			//}
+			this.logMessage(streetNames[street] + " dealt");
+
 			this.street = street;
 			this.toCall = 0;
 			this.betCounter = 0;
-
-			this.logMessage(Game.streetNames[street] + " dealt");
 		}
 
 		return onStreet;
@@ -108,37 +106,85 @@ class Player {
 		this.game = game;
 		this.seatID = seatID;
 
-		this.display = this.game.doc.createElement('div');
+		/*this.display = this.game.doc.createElement('div');
 		this.display.class = "hud-stats-display";
 		this.display.style.position = "absolute";
 		this.display.style.visibility = "hidden";
 		this.display.style.backgroundColor = "white";
 		this.display.style.border = "1px solid black";
-		this.display.style.zIndex = 10000;
+		this.display.style.zIndex = 10000;*/
+		this.popup = this.generateStatsPopup();
 
-		this.game.root.appendChild(this.display);
+		/*this.game.root.appendChild(this.display);
 		this.displayPositions = [0, 0, 0, 0];
-		this.display.onmousedown = this.dragMouseDown.bind(this);
+		this.display.onmousedown = this.dragMouseDown.bind(this);*/
+		this.game.root.appendChild(this.popup);
 
-		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
-		this.hole = null;
-		this.btn = this.seat.querySelector(Player.btnDOMQS);
+		this.seat = this.getSeatDOM();
+		this.hole = this.getHoleDOM();
+		this.btn = this.getBTNDOM();
+		this.bet = null;
 
 		this.nhands = 0;
 		this.nvpip 	= 0;
 		this.npfr 	= 0;
 		this.n3bet	= 0;
-
 		this.dealtIn = 0;
 		this._vpip 	= 0;
 		this._pfr 	= 0;
 		this._3bet 	= 0;
-
 		this.lastBet = 0;
 		this.status = 0;
 	}
 
-	dragMouseDown(e) {
+	generateStatsPopup() {
+		let popup = this.game.doc.createElement("div");
+		popup.class = "hud-stats-display";
+		popup.style.position = "absolute";
+		popup.style.visibility = "hidden";
+		popup.style.backgroundColor = "white";
+		popup.style.border = "1px solid black";
+		popup.style.zIndex = 10000;
+
+		let x1 = 0;
+		let y1 = 0;
+		let x2 = 0;
+		let y2 = 0;
+
+		function dragMouseDown(e) {
+			e = e || this.game.doc.defaultView.event;
+			e.preventDefault();
+
+			x2 = e.clientX;
+			y2 = e.clientY;
+			this.game.doc.onmouseup = closeDrag.bind(this);
+			this.game.doc.onmousemove = mouseDrag.bind(this);
+		}
+
+		function mouseDrag(e) {
+			e = e || this.game.doc.defaultView.event;
+			e.preventDefault();
+
+			x1 = x2 - e.clientX;
+			y1 = y2 - e.clientY;
+			x2 = e.clientX;
+			y2 = e.clientY;
+
+			popup.style.left = (popup.offsetLeft-x1)+"px";
+			popup.style.top = (popup.offsetTop-y1)+"px";
+		}
+
+		function closeDrag() {
+			this.game.doc.onmouseup = null;
+			this.game.doc.onmousemove = null;
+		}
+
+		popup.onmousedown = dragMouseDown.bind(this);
+
+		return popup
+	}
+
+	/*dragMouseDown(e) {
 		e = e || this.game.doc.defaultView.event;
 		e.preventDefault();
 
@@ -164,17 +210,31 @@ class Player {
 	closeDragStats() {
 		this.game.doc.onmouseup = null;
 		this.game.doc.onmousemove = null;
+	}*/
+
+	getSeatDOM() {
+		return this.game.doc.querySelector(
+			`[data-qa="playerContainer-${this.seatID}"]`);
+	}
+
+	getHoleDOM() {
+		return this.getSeatDOM().querySelector("[data-qa='holeCards']");
+	}
+
+	getBTNDOM() {
+		return this.getSeatDOM().querySelector(".fm87pe9.Desktop");
+	}
+
+	getBetDOM() {
+		return this.getSeatDOM().querySelector(".f1p6pf8a.Desktop");
 	}
 
 	resetStatsPosition() {
-		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
-		this.btn = this.seat.querySelector(Player.btnDOMQS);
-
-		let seatRect = this.seat.getBoundingClientRect();
+		let seatRect = this.getSeatDOM().getBoundingClientRect();
 		let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
 		let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.getZoom()).toString() + "px";
-		this.display.style.top = verticalMiddle;
-		this.display.style.left = horizontalMiddle;
+		this.popup.style.top = verticalMiddle;
+		this.popup.style.left = horizontalMiddle;
 	}
  	
 	onBTNMove() {
@@ -186,41 +246,43 @@ class Player {
 
  	// Make this player as active as possible; ran every time the button moves
 	reinitialize() {
-		this.bet = this.seat.querySelector(Player.betDOMQS);
-		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
+		this.bet = this.getBetDOM();
 
 		if (this.bet && this.status === 0) { // Active but uninitialized (player needs to be initialized)
 			this.logMessage("initialized");
 
-			this.hole = this.seat.querySelector(Player.holeDOMQS);
-			let holeObsCallback = this.onHoleChange.bind(this);
+			this.hole = this.getHoleDOM();
 			let holeObsConfig = {
 				attributes: true,
 				attributeFilter: ['style'],
 				attributeOldValue: true
 			};
-			this.holeObs = new MutationObserver(holeObsCallback).observe(this.hole, holeObsConfig);
+			this.holeObs = new MutationObserver(this.onHoleChange.bind(this)).observe(this.hole, holeObsConfig);
 			
-			// Create observer for bet DOM element
-			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, {characterData: true, childList: true, attributes: true, subtree: true});
+			let betObsConfig = {
+				characterData: true,
+				childList: true,
+				attributes: true,
+				subtree: true
+			};
+			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, betObsConfig);
 			
-			// Make stats display visible and position it
 			this.resetStatsPosition();
-			this.display.style.visibility = "visible";
+			this.popup.style.visibility = "visible";
 
-			// Set status to initialized
 			this.status = 1;
 		}
 		else if (!this.bet && this.status === 1) { // Inactive but initialized (player needs to be uninitialized)
 			this.logMessage("is no longer sitting here, uninitialized");
 
 			// Made stats display invisible
-			this.display.style.visibility = "hidden";
+			this.popup.style.visibility = "hidden";
 
 			// Set status to uninitialized and make sure the player has no pointers to DOM objects
 			this.status = 0;
 			this.bet = null;
 			this.betObs = null;
+			this.holeObs = null;
 		}
 		// else: Active and initialized or inactive and uninitialzed (aka correct state)
 
@@ -273,7 +335,7 @@ class Player {
 				}
 				this.game.toCall = newBet;
 			}
-			else { // Player calls
+			else {
 				this.logMessage(`calls the bet of ${toCall}`);
 				this._vpip = 1;
 			}
@@ -332,8 +394,8 @@ class Player {
 	updateDisplay() {
 		let winX = this.game.root.offsetWidth;
 		let winY = this.game.root.offsetHeight;
-		let displayX = parseInt(this.display.style.left, 10);
-		let displayY = parseInt(this.display.style.top, 10);
+		let displayX = parseInt(this.popup.style.left, 10);
+		let displayY = parseInt(this.popup.style.top, 10);
 
 		if (displayX > winX || displayY > winY) {
 			this.resetStatsPosition();
@@ -348,7 +410,7 @@ class Player {
 			bet3 = Math.round(100*this.n3bet/this.nhands);
 		}
 		let displayStr = `Stats for Player ${this.seatID}</br>VPIP: ${vpip}%</br>PFR: ${pfr}%</br>3bet: ${bet3}%</br>Hands: ${this.nhands}`;
-		this.display.innerHTML = displayStr;
+		this.popup.innerHTML = displayStr;
 	}
 }
 
@@ -376,22 +438,12 @@ function onFrameChange(mlist, obs) {
 				setTimeout(function() {
 					console.log("timeout done");
 					console.log("game started");
-					games[i] = new Game(win.document, i, 6);
+					games[i] = new Game(win.document, i);
 				}, 10000);
 			}
 			else {
 				console.log("game closed");
 				games[i] = null;
-			}
-
-			// Whenever a new game is initialized or destroyed, the layout will change 
-			// and stats popups may get left offscreen or otherwise mispositioned
-			for (var j = 0; j < games.length; j++) {
-				/*if (games[j]) {
-					for (var k = 0; k < games[j].max; k++) {
-						games[j].players[k].resetStatsPosition();
-					}
-				}*/
 			}
 		}
 	}
