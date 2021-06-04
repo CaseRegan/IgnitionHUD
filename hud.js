@@ -6,29 +6,39 @@ class Game {
 	static streetNames = ['Hole cards', 'Flop', 'Turn', 'River'];
 
 	constructor(doc, id, max) {
+		// The "verbose" flag determines if actions will be logged in the Chrome console
+		// If it is set to false, each call to "logMessage" will do nothing
 		this.verbose = false;
 		this.logMessage(`Initializing ${this.max}max game`);
 
+		// TODO: better detection of if this game can be initialized or not
 		if (!doc) {
 			return null;
 		}
 
 		this.doc = doc;			// The client uses an iframe for each table you're at and this is a pointer to the corresponding html doc
-		this.root = this.doc.querySelector(Game.rootDOMQS);
 		this.gameID = id;		// Indicates if this game is table 1, 2, 3, or 4
 		this.max = max;			// The maximum number of seats at the game (ex: 6 for a 6max game)
+		// TODO: initialize max automatically instead of through a parameter
 		
 		this.street = 0;		// Indicates what street the game is currently playing (preflop, flop, turn, or river)
 		this.betCounter = 0;	// Indicates the number of raises on the current street
 
+		// Relate DOM elements to each group of community cards (flop, turn, and river)
 		this.community = this.doc.querySelector(Game.communityDOMQS);
-		this.flop = this.community.children[0]; 	// DOM element of first card of flop
-		this.turn = this.community.children[3]; 	// DOM element of turn card
-		this.river = this.community.children[4]; 	// DOM element of river card
+		this.flop = this.community.children[0];
+		this.turn = this.community.children[3];
+		this.river = this.community.children[4];
+
+		// Bind a custom callback function to changes in the DOM elements of each group of community cards
 		new MutationObserver(this.makeStreetCallback(1).bind(this)).observe(this.flop, {attributes: true, childList: true, subtree: true});
 		new MutationObserver(this.makeStreetCallback(2).bind(this)).observe(this.turn, {attributes: true, childList: true, subtree: true});
 		new MutationObserver(this.makeStreetCallback(3).bind(this)).observe(this.river, {attributes: true, childList: true, subtree: true});
 
+ 		// This is the DOM element in which stats popups are placed
+		this.root = this.doc.querySelector(Game.rootDOMQS);
+
+		// Initialize list of players
 		this.players = [];
 		for (var i = 0; i < this.max; i++) {
 			this.players.push(new Player(this, i));
@@ -38,6 +48,7 @@ class Game {
 				attributeFilter: ['style'],
 				attributeOldValue: true
 			};
+			// Observes button movement to detect when the next hand has started
 			new MutationObserver(btnObsCallback).observe(this.players[i].btn, btnObsConfig);
 		}
 	}
@@ -52,12 +63,7 @@ class Game {
 		return Number(this.doc.querySelector(Game.zoomDOMQS).style.zoom);
 	}
 
-	onNewGame() {
-		for (var i = 0; i < this.max; i++) {
-			this.players[i].resetStatsPosition();
-		}
-	}
-
+	// Creates the custom callback function for each player to tell them that the button moved
 	makeBTNCallback(seat) {
 		function onBTNMove(mlist, obs) {
 			let state1 = mlist[0].oldValue.split(';')[0].split(' ')[1];
@@ -95,6 +101,7 @@ class Game {
 class Player {
 	static btnDOMQS = ".fm87pe9.Desktop";
 	static betDOMQS = ".f1p6pf8a.Desktop";
+	static holeDOMQS = "[data-qa='holeCards']";
 
 	constructor(game, seatID) {
 		this.game = game;
@@ -113,6 +120,7 @@ class Player {
 		this.display.onmousedown = this.dragMouseDown.bind(this);
 
 		this.seat = this.game.doc.querySelector(`[data-qa="playerContainer-${this.seatID}"]`);
+		this.hole = null;
 		this.btn = this.seat.querySelector(Player.btnDOMQS);
 
 		this.nhands = 0;
@@ -120,6 +128,7 @@ class Player {
 		this.npfr 	= 0;
 		this.n3bet	= 0;
 
+		this.dealtIn = 0;
 		this._vpip 	= 0;
 		this._pfr 	= 0;
 		this._3bet 	= 0;
@@ -169,6 +178,7 @@ class Player {
  	
 	onBTNMove() {
 		this.updateStats();
+		this.dealtIn = 0;
 		this.updateDisplay();
 		this.reinitialize();
 	}
@@ -180,6 +190,15 @@ class Player {
 
 		if (this.bet && this.status === 0) { // Active but uninitialized (player needs to be initialized)
 			this.logMessage("initialized");
+
+			this.hole = this.seat.querySelector(Player.holeDOMQS);
+			let holeObsCallback = this.onHoleChange.bind(this);
+			let holeObsConfig = {
+				attributes: true,
+				attributeFilter: ['style'],
+				attributeOldValue: true
+			};
+			this.holeObs = new MutationObserver(holeObsCallback).observe(this.hole, holeObsConfig);
 			
 			// Create observer for bet DOM element
 			this.betObs = new MutationObserver(this.onBetChange.bind(this)).observe(this.bet, {characterData: true, childList: true, attributes: true, subtree: true});
@@ -188,6 +207,7 @@ class Player {
 			this.resetStatsPosition();
 			this.display.style.visibility = "visible";
 
+			// Set status to initialized
 			this.status = 1;
 		}
 		else if (!this.bet && this.status === 1) { // Inactive but initialized (player needs to be uninitialized)
@@ -212,8 +232,6 @@ class Player {
 		let toCall = this.game.toCall;
 		let amtCall = toCall - this.lastBet;
 
-		// Bug: when the player is in the hand, stats get messed up
-
 		if (this.game.street === 0) {
 			if (newBet === 0 || amtBet < 0) {
 				if (this.lastBet >= toCall) {
@@ -235,11 +253,13 @@ class Player {
 					this.game.betCounter += 1;
 				}
 				else {
-					// Raise (TODO classify RFI, 3bet, 4bet etc...)
+					// Raise first in
 					if (this.game.betCounter === 2) {
 						this.logMessage(`has ${amtCall} to call, raises first in to ${newBet}`);
 					}
 					else if (this.game.betCounter >= 3) {
+						// TODO: Fix and make this only capture 3bets, not 4bets+ as well
+						// There's an issue where if the player is involved in a 3bet hand it won't record correctly
 						this.logMessage(`has ${amtCall} to call, 3bets to ${newBet}`);
 						this._3bet = 1;
 					}
@@ -265,11 +285,30 @@ class Player {
 		// Right now there's nothing to do here
 	}
 
+	onHoleChange(mlist, obs) {
+		let mlistSplit = mlist[0].oldValue.split(';');
+		let state1 = mlistSplit[mlistSplit.length-2].split(' ');
+		let state2 = mlist[0].target.style.opacity;
+
+		if (state1[1] === 'opacity:') {
+			if (parseInt(state1[2]) === 0 && parseInt(state2) === 1) {
+				this.logMessage(`dealt hole cards`);
+				this.dealtIn = 1;
+			}
+		}
+	}
+
 	logMessage(message) {
 		this.game.logMessage(`Player ${this.seatID}: ${message}`);
 	}
 
+	// Ran at the end of each hand to update the player's statistics based on their actions
+	// This can't be done as the hand is in progress because some actions may need future context
 	updateStats() {
+		if (!this.dealtIn) {
+			return;
+		}
+
 		if (this.status === 1) {
 			this.nvpip += this._vpip;
 			this.npfr += this._pfr;
@@ -287,7 +326,18 @@ class Player {
 		this._3bet = 0;
 	}
 
+	// Updates the stats popup display
+	// TODO: Consider putting logic for keeping the popup on screen after display changes here?
 	updateDisplay() {
+		let winX = this.game.root.offsetWidth;
+		let winY = this.game.root.offsetHeight;
+		let displayX = parseInt(this.display.style.left, 10);
+		let displayY = parseInt(this.display.style.top, 10);
+
+		if (displayX > winX || displayY > winY) {
+			this.resetStatsPosition();
+		}
+
 		let vpip = 0;
 		let pfr = 0;
 		let bet3 = 0;
@@ -304,8 +354,11 @@ class Player {
 let frame = document.getElementsByClassName("f1djomsr")[0];
 let games = [null, null, null, null];
 
+// Observes the page and acts when an element in the list where games go is changed
 new MutationObserver(onFrameChange).observe(frame, {childList: true});
 
+// Ran whenever the state of the main page changes
+// Checks for what type of event happened and acts accordingly
 function onFrameChange(mlist, obs) {	
 	for (var i = 0; i < mlist.length; i++) {
 		if (mlist[i].addedNodes.length) {
@@ -315,6 +368,9 @@ function onFrameChange(mlist, obs) {
 				win = iframe.contentWindow;
 			}
 			if (win) {
+				// This uses a timeout right now, so it will fail on especially slow PCs
+				// and be annoyingly slow on very fast ones. Can be improved but this is
+				// an easy solution for right now.
 				console.log("starting timeout to account for load time...");
 				setTimeout(function() {
 					console.log("timeout done");
@@ -326,10 +382,15 @@ function onFrameChange(mlist, obs) {
 				console.log("game closed");
 				games[i] = null;
 			}
+
+			// Whenever a new game is initialized or destroyed, the layout will change 
+			// and stats popups may get left offscreen or otherwise mispositioned
 			for (var j = 0; j < games.length; j++) {
-				if (games[j]) {
-					games[j].onNewGame();
-				}
+				/*if (games[j]) {
+					for (var k = 0; k < games[j].max; k++) {
+						games[j].players[k].resetStatsPosition();
+					}
+				}*/
 			}
 		}
 	}

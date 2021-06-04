@@ -14,5 +14,7 @@ Current features:
 TODO list:
 - Other important stats (cbet, agg)
 - Automatically detecting table size (very easy I'm just lazy)
-- Bug fixes (there are bugs related to the stats so they may be slightly off -- I'm a busy guy but will get around to fixing these)
+- Bug: some players record stats before being dealt in (they will be 0/0/0/X for the X hands before they're dealt in)
+- Bug: If you disconnect from a game, the HUD will not reappear
 - Errors when loading into a blank table (with no game). Unclear if these actually cause any problems though.
+- Make the popups spawn in a better spot -- right now they appear right on top of each player's cards, which helps identify who they belong too but isn't where anyone will keep them.
