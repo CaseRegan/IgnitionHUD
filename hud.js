@@ -373,20 +373,20 @@ function onFrameChange(mlist, obs) {
         win = iframe.contentWindow;
       }
       if (win) {
-                // This uses a timeout right now, so it will fail on especially slow PCs
-                // and be annoyingly slow on very fast ones. Can be improved but this is
-                // an easy solution for right now.
-                console.log("starting timeout to account for load time...");
-                setTimeout(function() {
-                  console.log("timeout done");
-                  console.log("game started");
-                  games[i] = new Game(win.document, i);
-                }, 10000);
-              }
-              else {
-                console.log("game closed");
-                games[i] = null;
-              }
-            }
-          }
-        }
+        // This uses a timeout right now, so it will fail on especially slow PCs
+        // and be annoyingly slow on very fast ones. Can be improved but this is
+        // an easy solution for right now.
+        console.log("starting timeout to account for load time...");
+        setTimeout(function() {
+          console.log("timeout done");
+          console.log("game started");
+          games[i] = new Game(win.document, i);
+        }, 10000);
+      }
+      else {
+        console.log("game closed");
+        games[i] = null;
+      }
+    }
+  }
+}
