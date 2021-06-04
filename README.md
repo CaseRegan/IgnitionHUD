@@ -13,7 +13,6 @@ Current features:
 
 TODO list:
 - Other important stats (cbet, agg)
-- Automatically detecting table size (very easy I'm just lazy)
 - Bug: If you disconnect from a game, the HUD will not reappear
 - Errors when loading into a blank table (with no game). Unclear if these actually cause any problems though.
 - Make the popups spawn in a better spot -- right now they appear right on top of each player's cards, which helps identify who they belong too but isn't where anyone will keep them.

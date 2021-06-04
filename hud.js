@@ -18,8 +18,9 @@ class Game {
 
 		this.doc = doc;			// The client uses an iframe for each table you're at and this is a pointer to the corresponding html doc
 		this.gameID = id;		// Indicates if this game is table 1, 2, 3, or 4
-		this.max = max;			// The maximum number of seats at the game (ex: 6 for a 6max game)
-		// TODO: initialize max automatically instead of through a parameter
+
+		this.max = this.doc.querySelector(Game.zoomDOMQS).childNodes.length-2;
+								// The maximum number of seats at the game (ex: 6 for a 6max game)
 		
 		this.street = 0;		// Indicates what street the game is currently playing (preflop, flop, turn, or river)
 		this.betCounter = 0;	// Indicates the number of raises on the current street
