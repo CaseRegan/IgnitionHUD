@@ -10,8 +10,7 @@ class Game {
     this.toCall = 0;
     this.betCounter = 0;
 
-    /** Creates DOM element/observer combos for important events. */
-    this.root = this.getRootDOM();
+    this.root = this.getRootDOM();  // High-level div where popups are inserted
     this.community = this.getCommunityDOM();
     this.flop = this.community.children[0];
     this.turn = this.community.children[3];
@@ -28,7 +27,6 @@ class Game {
     new MutationObserver(this.makeStreetCallback(3).bind(this)).observe(
       this.river, comObsConfig);
 
-    /** Populates a list of players in the game. */
     this.players = [];
     for (var i = 0; i < this.max; i++) {
       this.players.push(new Player(this, i));
@@ -42,16 +40,15 @@ class Game {
     }
   }
 
-  /** If the verbose flag was set, log the passed 
-   * message in the Chrome console */
   logMessage(message) {
     if (this.verbose) {
       console.log(message);
     }
   }
 
-  /** The four methods below select corresponding DOM elements that the 
-   * game uses to keep track of events.*/
+  /** The constats used by the querySelectors are unique IDs 
+   * that the client uses to identify DOM elements. */
+
   getMax() {
     return this.doc.querySelector(".f1so0fyt").childNodes.length-2;
   }
@@ -68,10 +65,6 @@ class Game {
     return Number(this.doc.querySelector(".f1so0fyt").style.zoom);
   }
 
-  /** Makes a callback function for the button moving. Each player will 
-   * trigger their "onBTNMove function (same name, different function -- 
-   * maybe fix that)" when this happens, effectively telling them to 
-   * reset for the next hand. */
   makeBTNCallback(seat) {
     function onBTNMove(mlist, obs) {
       let state1 = mlist[0].oldValue.split(';')[0].split(' ')[1];
@@ -92,9 +85,6 @@ class Game {
     return onBTNMove;
   }
 
-  /** Makes a callback function for the street being changed. */
-  /** TODO: currently only being used for verbose logging, but will
-   * be important again when I add flop, turn, and river statistics. */
   makeStreetCallback(street) {
     const streetNames = ['Hole cards', 'Flop', 'Turn', 'River'];
 
@@ -135,8 +125,13 @@ class Player {
     this.status = 0;
   }
 
-  /** Creates and returns a DOM element to be used as a popup, 
-   * complete with draggability and CSS. */
+  logMessage(message) {
+    this.game.logMessage(`Player ${this.seatID}: ${message}`);
+  }
+
+  /** Returns a div to be used as the stats popup. The div is styled and 
+   * made draggable in the function but is added to the DOM ("root" element 
+   * of Game) in the reinitialize function.*/
   generateStatsPopup() {
     let popup = this.game.doc.createElement("div");
     popup.class = "hud-stats-display";
@@ -184,13 +179,6 @@ class Player {
     return popup
   }
 
-  /** The four methods below select corresponding DOM elements that the 
-   * player uses to keep track of events.*/
-  /** TODO: I need to decide if I want to rely only on these methods 
-  * or only on class fields. It's difficult because the references in 
-  * the fields need to be updated occasionally, but I want to be able
-  * to easily access them from everywhere. */
-
   getSeatDOM() {
     return this.game.doc.querySelector(
       `[data-qa="playerContainer-${this.seatID}"]`);
@@ -208,8 +196,6 @@ class Player {
     return this.getSeatDOM().querySelector(".f1p6pf8a.Desktop");
   }
 
-  /** Resets the location of the popup to be at the center of 
-   * their "playerContainer" DOM element. */
   resetPopupPosition() {
     let seatRect = this.getSeatDOM().getBoundingClientRect();
     let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
@@ -218,8 +204,6 @@ class Player {
     this.popup.style.left = horizontalMiddle;
   }
 
-  /** Processes events that happen when the button moves (meaning 
-   * that the next hand is about to start). */
   onBTNMove() {
     this.updateStats();
     this.dealtIn = 0;
@@ -227,12 +211,9 @@ class Player {
     this.reinitialize();
   }
 
-  /** Checks the player's status and initializes them accordingly */
   reinitialize() {
     this.bet = this.getBetDOM();
 
-    /** The player is active but hasn't been recognized by the HUD 
-     * yet (in other words, they need to be initialized). */
     if (this.bet && this.status === 0) {
       this.logMessage("initialized");
 
@@ -257,8 +238,6 @@ class Player {
 
       this.status = 1;
     }
-    /** The player is recognized by the HUD but no longer is part 
-     * of the game (they need to be uninitialized). */
     else if (!this.bet && this.status === 1) {
       this.logMessage("is no longer sitting here, uninitialized");
 
@@ -269,11 +248,8 @@ class Player {
       this.betObs = null;
       this.holeObs = null;
     }
-    /** If neither of these conditions trigger, the 
-     * player is correctly initialized. */
   }
 
-  /** Processes events related to the bet in front of the player changing. */
   onBetChange(mlist, obs) {
     let newBet = Number(this.bet.innerHTML.replace(/\D/, '')).toFixed(2);
     let amtBet = (newBet - this.lastBet).toFixed(2);
@@ -282,8 +258,6 @@ class Player {
     let amtCall = toCall - this.lastBet;
 
     if (this.game.street === 0) {
-      /** Detects checks, zeroing out of bets when a 
-       * player continues to the next street, and folds. */
       if (newBet === 0 || amtBet < 0) {
         if (this.lastBet >= toCall) {
           this.logMessage("continues");
@@ -293,13 +267,7 @@ class Player {
         }
       } 
 
-      /** Detects raises */
       else if (amtBet > amtCall) {
-        /** The bet counter is used to track how many raises 
-         * have occured. This lets us classify a raise as a 
-         * blind (0th or 1st), RFI, 3bet, 4bet, etc... */
-        /** TODO: bet detection system fails when a blind is 
-         * skipped (sometimes happens when people leave/join. */
         if (this.game.betCounter === 0) {
           this.logMessage("posts small blind");
           this.game.betCounter += 1;
@@ -313,8 +281,6 @@ class Player {
             this.logMessage(`has ${amtCall} to call, raises first in to ${newBet}`);
           } 
           else if (this.game.betCounter === 3) {
-            /** TODO fix issues involving "your" seat being involved in 3bet
-             *  hands (need to identify the specifics of the issues first). */
             this.logMessage(`has ${amtCall} to call, 3bets to ${newBet}`);
             this._3bet = 1;
           } 
@@ -338,8 +304,6 @@ class Player {
     this.lastBet = newBet;
   }
 
-  /** Processes events related to the hole cards changing 
-   * (most importantly, when the player is dealt in). */
   onHoleChange(mlist, obs) {
     let mlistSplit = mlist[0].oldValue.split(';');
     let state1 = mlistSplit[mlistSplit.length-2].split(' ');
@@ -353,29 +317,21 @@ class Player {
     }
   }
 
-  logMessage(message) {
-    this.game.logMessage(`Player ${this.seatID}: ${message}`);
-  }
-
-  /** Updates the player's stats. Ran at the end of each hand 
-   * rather than during it, since some statistics depend on how 
-   * the rest of the hand goes */
+  /** Updates stats based on what happened in the previous round. 
+   * This can't be done as the hand is played since some stats 
+   * depend on future information. */
   updateStats() {
-    if (!this.dealtIn) {
-      return;
-    }
-
-    if (this.status === 1) {
-      this.nvpip += this._vpip;
-      this.npfr += this._pfr;
-      this.n3bet += this._3bet;
-      this.nhands += 1;
-    }
-    else {
+    if (this.status === 0 || !this.dealtIn) {
       this.nvpip = 0;
       this.npfr = 0;
       this.n3bet = 0;
       this.nhands = 0;
+    }
+    else if (this.status === 1) {
+      this.nvpip += this._vpip;
+      this.npfr += this._pfr;
+      this.n3bet += this._3bet;
+      this.nhands += 1;
     }
       
     this._vpip = 0;
@@ -383,10 +339,8 @@ class Player {
     this._3bet = 0;
   }
 
-  /** Updates the player's popup stats display to reflect
-   * the most current statistics. Also checks if the popup
-   * is positioned on screen, and if not, move it back to
-   * its default location. */
+  /** Updates the content of the popup and resets it to its 
+   * default location if it has moved offscreen */
   updatePopup() {
     let winX = this.game.root.offsetWidth;
     let winY = this.game.root.offsetHeight;
@@ -410,11 +364,8 @@ class Player {
   }
 }
 
-/** Processes events related to games being joined or left. */
 function onFrameChange(mlist, obs) {    
   for (var i = 0; i < mlist.length; i++) {
-    /** Nodes are added while creating or leaving a game. 
-     * Occasionally other events happen but this filters those out. */
     if (mlist[i].addedNodes.length) {
       let win = null;
       let iframe = mlist[i].addedNodes[0].querySelector('[title="Table slot"]');
@@ -422,8 +373,6 @@ function onFrameChange(mlist, obs) {
         win = iframe.contentWindow;
       }
 
-      /** If this section finds a non-null "win" object, it knows it 
-       * can start a HUD instance for this game. */
       if (win) {
         console.log("starting timeout to account for load time...");
         setTimeout(function() {
@@ -432,8 +381,6 @@ function onFrameChange(mlist, obs) {
           games[i] = new Game(win.document, i);
         }, 10000);
       }
-      /** If no "win" object is found, by process of elimination this 
-       * event was triggered by a game being left. */
       else {
         console.log("game closed");
         games[i] = null;
@@ -442,10 +389,6 @@ function onFrameChange(mlist, obs) {
   }
 }
 
-/** The variable "frame" points to the div that holds up to four games 
- * at a time. Each empty game looks different than a game you are sitting
- * at so the observer checks for a change in one of these games and creates
- * or destroys a HUD Game class instance accordingly. */
 let frame = document.getElementsByClassName("f1djomsr")[0];
 let games = [null, null, null, null];
 new MutationObserver(onFrameChange).observe(frame, {childList: true});
