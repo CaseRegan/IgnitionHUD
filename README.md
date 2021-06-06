@@ -25,5 +25,6 @@ TODO list:
 - Other important stats (cbet, agg)
 - Bug: If you disconnect from a game, the HUD will not reappear
 - Bug: If the small blind is skipped (sometimes happens after players leave/join), the big blind is treated as the small blind, first raise as the big blind, etc...
+- Bug: "you" being involved in hands sometimes messes up the statistics recorded. Unclear why to me right now.
 - Errors when loading into a blank table (with no game). Unclear if these actually cause any problems though.
 - Make the popups spawn in a better spot -- right now they appear right on top of each player's cards, which helps identify who they belong too but isn't where anyone will keep them.

@@ -1,7 +1,6 @@
 class Game {
   constructor(doc, id) {
     this.verbose = false;
-    this.logMessage(`Initializing ${this.max}max game`);
 
     this.doc = doc;
     this.gameID = id;
@@ -9,6 +8,8 @@ class Game {
     this.street = 0;
     this.toCall = 0;
     this.betCounter = 0;
+
+    this.logMessage(`Initializing ${this.max}max game`);
 
     this.root = this.getRootDOM();  // High-level div where popups are inserted
     this.community = this.getCommunityDOM();
@@ -47,7 +48,8 @@ class Game {
   }
 
   /** The constats used by the querySelectors are unique IDs 
-   * that the client uses to identify DOM elements. */
+   * that the client uses to identify DOM elements. The Player 
+   * class has a similar block of code.*/
 
   getMax() {
     return this.doc.querySelector(".f1so0fyt").childNodes.length-2;
@@ -197,11 +199,24 @@ class Player {
   }
 
   resetPopupPosition() {
+    let winY = this.game.root.offsetHeight;
     let seatRect = this.getSeatDOM().getBoundingClientRect();
-    let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
-    let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.getZoom()).toString() + "px";
-    this.popup.style.top = verticalMiddle;
-    this.popup.style.left = horizontalMiddle;
+
+    let horizontalPosition = (seatRect.left*this.game.getZoom()).toString() + "px";
+    this.popup.style.left = horizontalPosition;
+
+    /*let verticalPosition = (seatRect.top*this.game.getZoom()).toString() + "px";
+    this.popup.style.top = verticalPosition;*/
+
+    if (seatRect.bottom*this.game.getZoom() > winY/2) {
+      this.popup.style.top = (seatRect.bottom*this.game.getZoom()).toString() + "px";
+    }
+    else {
+      this.popup.style.top = (seatRect.top*this.game.getZoom()).toString() + "px";
+    }
+
+    /*let verticalMiddle = Math.round((seatRect.top+(seatRect.bottom-seatRect.top)/2)*this.game.getZoom()).toString() + "px";
+    let horizontalMiddle = Math.round((seatRect.left+(seatRect.right-seatRect.left)/2)*this.game.getZoom()).toString() + "px";*/
   }
 
   onBTNMove() {
@@ -236,6 +251,9 @@ class Player {
       this.resetPopupPosition();
       this.popup.style.visibility = "visible";
 
+      // Bug: new players don't record stats, possibly 
+      // because they aren't getting dealt in (as in "dealtIn"
+      // isn't being set for them)?
       this.status = 1;
     }
     else if (!this.bet && this.status === 1) {
@@ -250,24 +268,31 @@ class Player {
     }
   }
 
+  /** This function has all the logic for what happens when a player's bet
+   * changes. This includes blinds, raises, folds, checks, and calls, which
+   * all trigger events even if the bet amount doesn't necessarily change. 
+   * Since this is the most dense section of code, if anything needs code 
+   * quality work it's this.*/
   onBetChange(mlist, obs) {
     let newBet = Number(this.bet.innerHTML.replace(/\D/, '')).toFixed(2);
     let amtBet = (newBet - this.lastBet).toFixed(2);
-
     let toCall = this.game.toCall;
     let amtCall = toCall - this.lastBet;
 
+    // Bug: when a player is delayed in posting 
+    // their blind, it doesn't register
+
     if (this.game.street === 0) {
       if (newBet === 0 || amtBet < 0) {
-        if (this.lastBet >= toCall) {
+        /*if (this.lastBet >= toCall) {
           this.logMessage("continues");
         } 
         else {
           this.logMessage("folds");
-        }
+        }*/
       } 
 
-      else if (amtBet > amtCall) {
+      else if (newBet > toCall) {
         if (this.game.betCounter === 0) {
           this.logMessage("posts small blind");
           this.game.betCounter += 1;
@@ -293,9 +318,7 @@ class Player {
         }
         this.game.toCall = newBet;
       }
-
-      /** Detects calls */
-      else {
+      else if (newBet === toCall) {
         this.logMessage(`calls the bet of ${toCall}`);
         this._vpip = 1;
       }
@@ -307,12 +330,20 @@ class Player {
   onHoleChange(mlist, obs) {
     let mlistSplit = mlist[0].oldValue.split(';');
     let state1 = mlistSplit[mlistSplit.length-2].split(' ');
-    let state2 = mlist[0].target.style.opacity;
+    let state2 = parseInt(mlist[0].target.style.opacity);
 
-    if (state1[1] === 'opacity:') {
-      if (parseInt(state1[2]) === 0 && parseInt(state2) === 1) {
+    let style = state1[1];
+    state1 = parseInt(state1[2]);
+
+    if (style === 'opacity:') {
+      if (state1 === 0 && state2 === 1) {
         this.logMessage(`dealt hole cards`);
         this.dealtIn = 1;
+      }
+      else if (state1 === 1 && state2 === 0) {
+        // If I want to correctly record folds (no need to right now), I 
+        // need to account for the fact that "your" cards don't vanish when you fold.
+        //this.logMessage(`folds`);
       }
     }
   }
